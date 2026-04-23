@@ -62,6 +62,8 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     score: 0,
     streak: 0,
     comboFlash: 0,
+    comboTextT: 0,
+    guidePulse: 0,
     lastGain: 0,
     best: Number(localStorage.getItem(STORAGE_KEY)||0),
     over: false,
@@ -90,6 +92,8 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     state.score = 0;
     state.streak = 0;
     state.comboFlash = 0;
+    state.comboTextT = 0;
+    state.guidePulse = 0;
     state.lastGain = 0;
     state.over = false;
     state.camLift = 0;
@@ -218,7 +222,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
 
     const a = state.mover;
     const prev = state.blocks[state.blocks.length-1];
-    const perfect = 6;
+    const perfect = 12;
 
     let wasPerfect = false;
 
@@ -283,9 +287,13 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       state.streak += 1;
       gain = 2 + Math.max(0, state.streak - 1);
       state.comboFlash = 1;
+      state.comboTextT = 1;
+      state.guidePulse = 1;
     } else {
       state.streak = 0;
       state.comboFlash = 0;
+      state.comboTextT = 0;
+      state.guidePulse = 0;
     }
 
     state.lastGain = gain;
@@ -294,7 +302,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     saveBest();
 
     const burst = worldToScreen(a.x+a.w*0.5, a.y+a.d*0.5, a.z+a.h*0.65);
-    addBurst(burst.x, burst.y, wasPerfect ? 16 : 8);
+    addBurst(burst.x, burst.y, wasPerfect ? 26 : 8);
     spawnMover();
   }
 
@@ -308,8 +316,8 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
   }
 
   function updateCameraGameOver(){
-    state.goT = Math.min(1, state.goT + 0.0011);
-    const ease = 1 - Math.pow(1 - state.goT, 2.7);
+    state.goT = Math.min(1, state.goT + 0.0020);
+    const ease = 1 - Math.pow(1 - state.goT, 2.5);
     state.scale = state.goScaleStart + (state.goScaleTarget - state.goScaleStart) * ease;
     state.camPanY = state.goPanStart + (state.goPanTarget - state.goPanStart) * ease;
   }
@@ -324,6 +332,10 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     }
 
     state.comboFlash = Math.max(0, state.comboFlash - 0.025);
+
+    state.comboFlash = Math.max(0, state.comboFlash - 0.018);
+    state.comboTextT = Math.max(0, state.comboTextT - 0.014);
+    state.guidePulse = Math.max(0, state.guidePulse - 0.025);
 
     for(const p of state.particles){
       p.x += p.vx;
@@ -426,8 +438,8 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
 
   function drawUI(){
     const r = playfield();
-    function pill(x,y,w,h,fill){
-      const rad=h*0.42;
+    function pill(x,y,w,h,fill,stroke){
+      const rad=h*0.40;
       ctx.beginPath();
       ctx.moveTo(x+rad,y);
       ctx.arcTo(x+w,y,x+w,y+h,rad);
@@ -437,49 +449,56 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       ctx.closePath();
       ctx.fillStyle = fill;
       ctx.fill();
+      if(stroke){
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2*DPR;
+        ctx.stroke();
+      }
     }
 
-    const topY = (r.y + r.h*0.025) * DPR;
-    const cardH = r.h * 0.072 * DPR;
-    const sideW = r.w * 0.19 * DPR;
-    const centerW = r.w * 0.28 * DPR;
+    const topY = (r.y + r.h*0.022) * DPR;
+    const cardH = r.h * 0.082 * DPR;
+    const sideW = r.w * 0.20 * DPR;
+    const centerW = r.w * 0.30 * DPR;
 
-    // left best card
-    let x = (r.x + r.w*0.035) * DPR;
-    pill(x, topY, sideW, cardH, "rgba(255,255,255,0.22)");
-    ctx.fillStyle="rgba(255,255,255,0.72)";
+    let x = (r.x + r.w*0.032) * DPR;
+    pill(x, topY, sideW, cardH, "rgba(255,255,255,0.96)", "rgba(255,255,255,0.98)");
+    ctx.fillStyle="rgba(55,70,85,0.88)";
     ctx.textAlign="center";
     ctx.textBaseline="middle";
-    ctx.font=Math.round(r.w*0.030*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    ctx.fillText("BEST", x + sideW*0.5, topY + cardH*0.26);
-    ctx.fillStyle="rgba(255,255,255,0.98)";
-    ctx.font=Math.round(r.w*0.072*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.font=Math.round(r.w*0.028*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.fillText("HIGHSCORE", x + sideW*0.5, topY + cardH*0.26);
+    ctx.fillStyle="rgba(25,35,45,1)";
+    ctx.font=Math.round(r.w*0.070*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
     ctx.fillText(String(state.best), x + sideW*0.5, topY + cardH*0.68);
 
-    // center streak card
-    x = (r.x + r.w*0.36) * DPR;
-    const streakGlow = state.comboFlash > 0 ? `rgba(255,215,80,${0.22 + state.comboFlash*0.18})` : "rgba(255,255,255,0.16)";
-    pill(x, topY, centerW, cardH, streakGlow);
-    ctx.fillStyle = state.streak > 0 ? "rgba(255,228,120,0.98)" : "rgba(255,255,255,0.65)";
-    ctx.font=Math.round(r.w*0.034*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    const streakText = state.streak > 0 ? "PERFECT x" + state.streak : "STACK";
+    x = (r.x + r.w*0.35) * DPR;
+    const comboFill = state.comboFlash > 0 ? `rgba(255,178,40,${0.92})` : "rgba(255,255,255,0.92)";
+    const comboStroke = state.comboFlash > 0 ? "rgba(255,90,0,0.95)" : "rgba(255,255,255,0.98)";
+    pill(x, topY, centerW, cardH, comboFill, comboStroke);
+    ctx.fillStyle = state.comboFlash > 0 ? "rgba(120,30,0,1)" : "rgba(70,80,90,0.86)";
+    ctx.font=Math.round(r.w*0.030*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    const streakText = state.streak > 0 ? "🔥 COMBO x" + state.streak : "COMBO";
     ctx.fillText(streakText, x + centerW*0.5, topY + cardH*0.52);
 
-    // right score card
-    x = (r.x + r.w*0.775) * DPR;
-    const scoreFill = state.comboFlash > 0 ? `rgba(255,215,80,${0.18 + state.comboFlash*0.22})` : "rgba(255,255,255,0.22)";
-    pill(x, topY, sideW, cardH, scoreFill);
-    ctx.fillStyle="rgba(255,255,255,0.72)";
-    ctx.font=Math.round(r.w*0.030*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    x = (r.x + r.w*0.768) * DPR;
+    const scoreFill = state.comboFlash > 0 ? "rgba(255,240,190,0.98)" : "rgba(255,255,255,0.96)";
+    pill(x, topY, sideW, cardH, scoreFill, "rgba(255,255,255,0.98)");
+    ctx.fillStyle="rgba(55,70,85,0.88)";
+    ctx.font=Math.round(r.w*0.028*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
     ctx.fillText("SCORE", x + sideW*0.5, topY + cardH*0.26);
-    ctx.fillStyle="rgba(255,255,255,0.98)";
-    ctx.font=Math.round(r.w*0.072*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.fillStyle = state.comboFlash > 0 ? "rgba(180,90,0,1)" : "rgba(25,35,45,1)";
+    ctx.font=Math.round(r.w*0.070*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
     ctx.fillText(String(state.score), x + sideW*0.5, topY + cardH*0.68);
 
-    if(state.lastGain > 0 && state.comboFlash > 0){
-      ctx.fillStyle = "rgba(255,228,120," + (0.55 + state.comboFlash*0.35) + ")";
-      ctx.font=Math.round(r.w*0.040*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText("+" + state.lastGain, (r.x + r.w*0.87)*DPR, (r.y + r.h*0.12)*DPR);
+    if(state.lastGain > 0 && state.comboTextT > 0){
+      const a = 0.65 + state.comboTextT*0.35;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = state.streak > 0 ? "rgba(255,140,20,1)" : "rgba(255,255,255,1)";
+      ctx.font=Math.round(r.w*0.045*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      const extraY = (1 - state.comboTextT) * 20 * DPR;
+      ctx.fillText("+" + state.lastGain, (r.x + r.w*0.87)*DPR, (r.y + r.h*0.13)*DPR - extraY);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -494,7 +513,31 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     drawBaseShadow();
     for(const b of state.blocks) drawBlock(b,1);
     for(const s of state.scraps) drawBlock(s,0.92);
-    if(state.mover && !state.over) drawBlock(state.mover,1);
+
+    if(state.mover && !state.over){
+      const prev = state.blocks[state.blocks.length-1];
+      const guideAlpha = 0.10 + state.guidePulse * 0.16;
+      ctx.globalAlpha = guideAlpha;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 2 * DPR;
+      if(state.mover.dir === "x"){
+        const g1 = worldToScreen(prev.x, prev.y, state.mover.z + state.mover.h*0.52);
+        const g2 = worldToScreen(prev.x + prev.w, prev.y, state.mover.z + state.mover.h*0.52);
+        ctx.beginPath();
+        ctx.moveTo(g1.x*DPR, g1.y*DPR);
+        ctx.lineTo(g2.x*DPR, g2.y*DPR);
+        ctx.stroke();
+      } else {
+        const g1 = worldToScreen(prev.x, prev.y, state.mover.z + state.mover.h*0.52);
+        const g2 = worldToScreen(prev.x, prev.y + prev.d, state.mover.z + state.mover.h*0.52);
+        ctx.beginPath();
+        ctx.moveTo(g1.x*DPR, g1.y*DPR);
+        ctx.lineTo(g2.x*DPR, g2.y*DPR);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      drawBlock(state.mover,1);
+    }
     drawParticles();
 
     ctx.restore();
