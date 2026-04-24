@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"/>
+<title>Stack92</title>
+<style>
+html,body{
+  margin:0;height:100%;overflow:hidden;background:#000;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+}
+canvas{display:block;width:100vw;height:100vh;touch-action:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+
+  let DPR=1,W=0,H=0,CW=0,CH=0;
+  function resize(){
+    DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+    W=window.innerWidth; H=window.innerHeight;
+    CW=Math.floor(W*DPR); CH=Math.floor(H*DPR);
+    canvas.width=CW; canvas.height=CH;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+  const THEMES=[
+    {top:"#62C370",left:"#3F9A4E",right:"#2F7B3D",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#FF6B6B",left:"#D94C4C",right:"#B63D3D",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#4D96FF",left:"#2F74D6",right:"#225AA8",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#FFD93D",left:"#D7B428",right:"#B59018",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#B980F0",left:"#9464C9",right:"#7448A8",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#FF9F1C",left:"#D78112",right:"#B5660B",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#2EC4B6",left:"#21998E",right:"#18756E",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#F7B801",left:"#D09300",right:"#AA7600",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#F187B0",left:"#C96A90",right:"#A65173",bg1:"#a7d9dd",bg2:"#cde7c6"},
+    {top:"#8AC926",left:"#6FA01D",right:"#567C17",bg1:"#a7d9dd",bg2:"#cde7c6"}
+  ];
+
+  const STORAGE_KEY="stack92_best";
+
+  function playfield(){
+    const h = H*0.84;
+    const w = Math.min(h*0.64, W*0.58);
+    return {x:(W-w)/2, y:(H-h)/2 + H*0.01, w, h};
+  }
+
+  const state = {
+    blocks: [],
+    mover: null,
+    scraps: [],
+    particles: [],
+    stars: [],
+    score: 0,
+    heightBlocks: 1,
+    milestoneText: "",
+    milestoneSub: "",
+    milestoneT: 0,
+    milestonesShown: {},
+    streak: 0,
+    comboFlash: 0,
+    comboTextT: 0,
+    guidePulse: 0,
+    lastGain: 0,
+    best: Number(localStorage.getItem(STORAGE_KEY)||0),
+    over: false,
+    camLift: 0,
+    camPanY: 0,
+    scale: 1,
+    goT: 0,
+    goScaleStart: 1,
+    goScaleTarget: 1,
+    goPanStart: 0,
+    goPanTarget: 0
+  };
+
+  function saveBest(){
+    localStorage.setItem(STORAGE_KEY, String(state.best));
+  }
+
+  function themeFor(index){
+    return THEMES[index % THEMES.length];
+  }
+
+  const MILESTONES = [
+    {blocks:5, name:"HAUS", height:"10 m"},
+    {blocks:10, name:"KIRCHE", height:"30 m"},
+    {blocks:17, name:"BIG BEN", height:"96 m"},
+    {blocks:25, name:"KOELNER DOM", height:"157 m"},
+    {blocks:34, name:"EIFFELTURM", height:"330 m"},
+    {blocks:45, name:"EMPIRE STATE", height:"443 m"},
+    {blocks:58, name:"BURJ KHALIFA", height:"828 m"},
+    {blocks:75, name:"MOUNT EVEREST", height:"8.849 m"}
+  ];
+
+  function checkMilestone(){
+    for(const m of MILESTONES){
+      if(state.heightBlocks === m.blocks && !state.milestonesShown[m.blocks]){
+        state.milestonesShown[m.blocks] = true;
+        state.milestoneText = m.name;
+        state.milestoneSub = m.height;
+        state.milestoneT = 1;
+        addStarBurst((playfield().x + playfield().w*0.5), (playfield().y + playfield().h*0.22), 14);
+        break;
+      }
+    }
+  }
+
+  function resetGame(){
+    state.blocks = [{x:0,y:0,z:0,w:170,d:170,h:30,theme:0}];
+    state.scraps = [];
+    state.particles = [];
+    state.stars = [];
+    state.score = 0;
+    state.heightBlocks = 1;
+    state.milestoneText = "";
+    state.milestoneSub = "";
+    state.milestoneT = 0;
+    state.milestonesShown = {};
+    state.streak = 0;
+    state.comboFlash = 0;
+    state.comboTextT = 0;
+    state.guidePulse = 0;
+    state.lastGain = 0;
+    state.over = false;
+    state.camLift = 0;
+    state.camPanY = 0;
+    state.scale = 1;
+    state.goT = 0;
+    state.goScaleStart = 1;
+    state.goScaleTarget = 1;
+    state.goPanStart = 0;
+    state.goPanTarget = 0;
+    spawnMover();
+  }
+
+  function spawnMover(){
+    const prev = state.blocks[state.blocks.length-1];
+    const dir = (state.blocks.length % 2 === 1) ? "x" : "y";
+    const span = 250;
+    state.mover = {
+      dir,
+      x: dir==="x" ? -span : prev.x,
+      y: dir==="y" ? -span : prev.y,
+      z: prev.z + prev.h,
+      w: prev.w,
+      d: prev.d,
+      h: prev.h,
+      v: 3.6 + Math.min(4.5, state.score*0.03),
+      theme: state.blocks.length
+    };
+  }
+
+  function projectRaw(x,y,z,lift){
+    const r = playfield();
+    const cx = r.x + r.w*0.5;
+    const groundY = r.y + r.h*0.72 + lift;
+    return {
+      x: cx + (x-y)*0.86,
+      y: groundY + (x+y)*0.50 - z
+    };
+  }
+
+  function worldToScreen(x,y,z){
+    const r = playfield();
+    const p = projectRaw(x,y,z,state.camLift);
+    const ox = r.x + r.w*0.5;
+    const oy = r.y + r.h*0.82 + state.camPanY;
+    return {
+      x: ox + (p.x-ox)*state.scale,
+      y: oy + (p.y-oy)*state.scale
+    };
+  }
+
+  function blockRawBounds(block, lift){
+    const pts = [
+      projectRaw(block.x, block.y, block.z, lift),
+      projectRaw(block.x+block.w, block.y, block.z, lift),
+      projectRaw(block.x+block.w, block.y+block.d, block.z, lift),
+      projectRaw(block.x, block.y+block.d, block.z, lift),
+      projectRaw(block.x, block.y, block.z+block.h, lift),
+      projectRaw(block.x+block.w, block.y, block.z+block.h, lift),
+      projectRaw(block.x+block.w, block.y+block.d, block.z+block.h, lift),
+      projectRaw(block.x, block.y+block.d, block.z+block.h, lift),
+    ];
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    for(const p of pts){
+      minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+      minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+    }
+    return {minX,maxX,minY,maxY,w:maxX-minX,h:maxY-minY};
+  }
+
+  function towerRawBounds(lift){
+    let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+    for(const b of state.blocks){
+      const bb = blockRawBounds(b, lift);
+      minX=Math.min(minX,bb.minX); maxX=Math.max(maxX,bb.maxX);
+      minY=Math.min(minY,bb.minY); maxY=Math.max(maxY,bb.maxY);
+    }
+    return {minX,maxX,minY,maxY,w:maxX-minX,h:maxY-minY};
+  }
+
+  function computeGameOverTargets(){
+    const r = playfield();
+    const raw = towerRawBounds(state.camLift);
+
+    const availW = r.w*0.90;
+    const availH = r.h*0.84;
+    const fitScale = Math.min(availW/raw.w, availH/raw.h, 1);
+    const targetScale = clamp(fitScale*0.88, 0.05, 1);
+
+    const rawCenterY = (raw.minY + raw.maxY)*0.5;
+    const playCenterY = r.y + r.h*0.54;
+    const panTarget = (playCenterY - rawCenterY) * targetScale;
+
+    return {scale: targetScale, panY: panTarget};
+  }
+
+  function triggerGameOver(){
+    state.over = true;
+    state.goT = 0;
+    state.goScaleStart = state.scale;
+    state.goPanStart = state.camPanY;
+    const t = computeGameOverTargets();
+    state.goScaleTarget = t.scale;
+    state.goPanTarget = t.panY;
+    state.best = Math.max(state.best, state.score);
+    saveBest();
+  }
+
+  function addScrap(piece, positive){
+    if(!piece) return;
+    state.scraps.push({...piece, vx: positive?1.8:-1.8, vz:0, dead:false});
+  }
+
+  function addBurst(x,y,n){
+    for(let i=0;i<n;i++){
+      state.particles.push({
+        x,y,vx:rand(-1.5,1.5),vy:rand(-2.6,-0.6),g:rand(0.07,0.14),
+        size:rand(1.3,3.6), life:rand(16,36), max:36
+      });
+    }
+  }
+
+  function addStarBurst(x,y,n){
+    for(let i=0;i<n;i++){
+      const a = -Math.PI/2 + (Math.random()-0.5)*Math.PI*1.7;
+      const sp = 1.8 + Math.random()*3.8;
+      state.stars.push({
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp-1.0,
+        g:0.055+Math.random()*0.04,
+        rot:Math.random()*Math.PI*2,
+        vr:(Math.random()-0.5)*0.24,
+        size:7+Math.random()*8,
+        life:58+Math.random()*18,
+        max:76
+      });
+    }
+  }
+
+  function place(){
+    if(state.over){ resetGame(); return; }
+    if(!state.mover) return;
+
+    const a = state.mover;
+    const prev = state.blocks[state.blocks.length-1];
+    const perfect = 9;
+
+    let wasPerfect = false;
+
+    if(a.dir==="x"){
+      const dx = a.x - prev.x;
+      let overlap = prev.w - Math.abs(dx);
+
+      if(Math.abs(dx) <= perfect){
+        a.x = prev.x;
+        overlap = prev.w;
+        wasPerfect = true;
+      }
+
+      if(overlap <= 0){
+        addScrap({...a}, dx>0);
+        triggerGameOver();
+        return;
+      }
+
+      if(overlap < a.w){
+        if(dx > 0){
+          addScrap({x:a.x+overlap,y:a.y,z:a.z,w:a.w-overlap,d:a.d,h:a.h,theme:a.theme}, true);
+          a.w = overlap;
+        } else {
+          addScrap({x:a.x,y:a.y,z:a.z,w:a.w-overlap,d:a.d,h:a.h,theme:a.theme}, false);
+          a.x = prev.x;
+          a.w = overlap;
+        }
+      }
+    } else {
+      const dy = a.y - prev.y;
+      let overlap = prev.d - Math.abs(dy);
+
+      if(Math.abs(dy) <= perfect){
+        a.y = prev.y;
+        overlap = prev.d;
+        wasPerfect = true;
+      }
+
+      if(overlap <= 0){
+        addScrap({...a}, dy>0);
+        triggerGameOver();
+        return;
+      }
+
+      if(overlap < a.d){
+        if(dy > 0){
+          addScrap({x:a.x,y:a.y+overlap,z:a.z,w:a.w,d:a.d-overlap,h:a.h,theme:a.theme}, true);
+          a.d = overlap;
+        } else {
+          addScrap({x:a.x,y:a.y,z:a.z,w:a.w,d:a.d-overlap,h:a.h,theme:a.theme}, false);
+          a.y = prev.y;
+          a.d = overlap;
+        }
+      }
+    }
+
+    state.blocks.push({x:a.x,y:a.y,z:a.z,w:a.w,d:a.d,h:a.h,theme:a.theme});
+    state.heightBlocks = state.blocks.length;
+    checkMilestone();
+
+    let gain = 1;
+    if(wasPerfect){
+      state.streak += 1;
+      gain = 2 + Math.max(0, state.streak - 1);
+      state.comboFlash = 1;
+      state.comboTextT = 1;
+      state.comboTextT = 1;
+      state.guidePulse = 1;
+    } else {
+      state.streak = 0;
+      state.comboFlash = 0;
+      state.comboTextT = 0;
+      state.guidePulse = 0;
+    }
+
+    state.lastGain = gain;
+    state.score += gain;
+    state.best = Math.max(state.best, state.score);
+    saveBest();
+
+    const burst = worldToScreen(a.x+a.w*0.5, a.y+a.d*0.5, a.z+a.h*0.65);
+    addBurst(burst.x, burst.y, wasPerfect ? 26 : 8);
+    if(wasPerfect){
+      addStarBurst(burst.x, burst.y - 18, 10 + Math.min(18, state.streak*4));
+    }
+    spawnMover();
+  }
+
+  function updateCameraPlaying(){
+    const liftStart = 12;
+    const liftPer = 28;
+    const targetLift = state.blocks.length > liftStart ? (state.blocks.length-liftStart)*liftPer : 0;
+    state.camLift = lerp(state.camLift, targetLift, 0.12);
+    state.camPanY = lerp(state.camPanY, 0, 0.10);
+    state.scale = lerp(state.scale, 1, 0.10);
+  }
+
+  function updateCameraGameOver(){
+    state.goT = Math.min(1, state.goT + 0.0020);
+    const ease = 1 - Math.pow(1 - state.goT, 2.5);
+    state.scale = state.goScaleStart + (state.goScaleTarget - state.goScaleStart) * ease;
+    state.camPanY = state.goPanStart + (state.goPanTarget - state.goPanStart) * ease;
+  }
+
+  function update(){
+    if(!state.over) updateCameraPlaying();
+    else updateCameraGameOver();
+
+    if(state.mover && !state.over){
+      state.mover[state.mover.dir] += state.mover.v;
+      if(state.mover[state.mover.dir] > 260 || state.mover[state.mover.dir] < -260) state.mover.v *= -1;
+    }
+
+    state.comboFlash = Math.max(0, state.comboFlash - 0.025);
+
+    state.comboFlash = Math.max(0, state.comboFlash - 0.016);
+    state.comboTextT = Math.max(0, state.comboTextT - 0.012);
+    state.milestoneT = Math.max(0, state.milestoneT - 0.006);
+    state.guidePulse = Math.max(0, state.guidePulse - 0.025);
+
+    for(const p of state.particles){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.g;
+      p.life--;
+    }
+    state.particles = state.particles.filter(p=>p.life>0);
+
+    for(const st of state.stars){
+      st.x += st.vx;
+      st.y += st.vy;
+      st.vy += st.g;
+      st.rot += st.vr;
+      st.life--;
+    }
+    state.stars = state.stars.filter(st=>st.life>0);
+
+    for(const s of state.scraps){
+      s.vz += 0.28;
+      s.z -= s.vz;
+      s.x += s.vx;
+      if(s.z < -300) s.dead = true;
+    }
+    state.scraps = state.scraps.filter(s=>!s.dead);
+  }
+
+  function drawBackground(){
+    const r = playfield();
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0,0,CW,CH);
+
+    const theme = themeFor(state.score);
+    const x=r.x*DPR, y=r.y*DPR, w=r.w*DPR, h=r.h*DPR;
+
+    const g = ctx.createLinearGradient(0,y,0,y+h);
+    g.addColorStop(0, theme.bg1);
+    g.addColorStop(1, theme.bg2);
+    ctx.fillStyle = g;
+    ctx.fillRect(x,y,w,h);
+
+    const rg = ctx.createRadialGradient(x+w*0.5,y+h*0.35,20*DPR,x+w*0.5,y+h*0.65,h*0.82);
+    rg.addColorStop(0,"rgba(255,255,255,0.16)");
+    rg.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle = rg;
+    ctx.fillRect(x,y,w,h);
+
+    for(let i=0;i<20;i++){
+      const px = (r.x + ((i*101)%1000)/1000 * r.w) * DPR;
+      const py = (r.y + ((i*137 + performance.now()*0.01)%1000)/1000 * r.h) * DPR;
+      const s = ((i%3)+1) * DPR * 0.8;
+      ctx.globalAlpha = 0.16 + (i%4)*0.1;
+      ctx.fillStyle="#fff";
+      ctx.fillRect(px,py,s,s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBaseShadow(){}
+
+  function drawBlock(b, alpha=1){
+    const t = themeFor(b.theme);
+    const p1 = worldToScreen(b.x,b.y,b.z+b.h);
+    const p2 = worldToScreen(b.x+b.w,b.y,b.z+b.h);
+    const p3 = worldToScreen(b.x+b.w,b.y+b.d,b.z+b.h);
+    const p4 = worldToScreen(b.x,b.y+b.d,b.z+b.h);
+    const q1 = worldToScreen(b.x,b.y,b.z);
+    const q2 = worldToScreen(b.x+b.w,b.y,b.z);
+    const q3 = worldToScreen(b.x+b.w,b.y+b.d,b.z);
+    const q4 = worldToScreen(b.x,b.y+b.d,b.z);
+
+    ctx.globalAlpha = alpha;
+
+    ctx.fillStyle = t.left;
+    ctx.beginPath();
+    ctx.moveTo(p4.x*DPR,p4.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(q3.x*DPR,q3.y*DPR); ctx.lineTo(q4.x*DPR,q4.y*DPR);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = t.right;
+    ctx.beginPath();
+    ctx.moveTo(p2.x*DPR,p2.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(q3.x*DPR,q3.y*DPR); ctx.lineTo(q2.x*DPR,q2.y*DPR);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = t.top;
+    ctx.beginPath();
+    ctx.moveTo(p1.x*DPR,p1.y*DPR); ctx.lineTo(p2.x*DPR,p2.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(p4.x*DPR,p4.y*DPR);
+    ctx.closePath(); ctx.fill();
+
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.lineWidth = 1.5*DPR;
+    ctx.beginPath();
+    ctx.moveTo(p1.x*DPR,p1.y*DPR); ctx.lineTo(p2.x*DPR,p2.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(q3.x*DPR,q3.y*DPR); ctx.lineTo(q4.x*DPR,q4.y*DPR); ctx.lineTo(p4.x*DPR,p4.y*DPR); ctx.closePath();
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+  }
+
+  function drawStarParticle(x,y,r,rot,alpha){
+    ctx.save();
+    ctx.translate(x*DPR,y*DPR);
+    ctx.rotate(rot);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#ffd84a";
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1.1*DPR;
+    ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const a = -Math.PI/2 + i*Math.PI/5;
+      const rr = (i%2===0 ? r : r*0.44)*DPR;
+      const px = Math.cos(a)*rr;
+      const py = Math.sin(a)*rr;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawParticles(){
+    for(const p of state.particles){
+      const a = Math.max(0,p.life/p.max);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "rgba(255,255,255,"+a+")";
+      ctx.beginPath();
+      ctx.arc(p.x*DPR,p.y*DPR,p.size*DPR,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    for(const st of state.stars){
+      const a = Math.max(0, st.life/st.max);
+      drawStarParticle(st.x, st.y, st.size, st.rot, a);
+    }
+  }
+
+  function drawUI(){
+    const r = playfield();
+
+    function roundedRect(x,y,w,h,rad){
+      ctx.beginPath();
+      ctx.moveTo(x+rad,y);
+      ctx.arcTo(x+w,y,x+w,y+h,rad);
+      ctx.arcTo(x+w,y+h,x,y+h,rad);
+      ctx.arcTo(x,y+h,x,y,rad);
+      ctx.arcTo(x,y,x+w,y,rad);
+      ctx.closePath();
+    }
+
+    function drawCrown(cx, cy, s){
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.fillStyle = "#f3c63b";
+      ctx.strokeStyle = "rgba(219,165,20,0.95)";
+      ctx.lineWidth = 1.2 * DPR;
+      ctx.beginPath();
+      ctx.moveTo(-11*s, 6*s);
+      ctx.lineTo(-11*s, 11*s);
+      ctx.lineTo(11*s, 11*s);
+      ctx.lineTo(11*s, 6*s);
+      ctx.lineTo(6*s, 6*s);
+      ctx.lineTo(3*s, -5*s);
+      ctx.lineTo(0, 1*s);
+      ctx.lineTo(-3*s, -6*s);
+      ctx.lineTo(-6*s, 6*s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      for(const px of [-6,0,6]){
+        ctx.beginPath();
+        ctx.arc(px*s, -7*s, 1.6*s, 0, Math.PI*2);
+        ctx.fillStyle = "#ffe88b";
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawStar(cx, cy, s){
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.fillStyle = "#f3c63b";
+      ctx.strokeStyle = "rgba(219,165,20,0.95)";
+      ctx.lineWidth = 1.0 * DPR;
+      ctx.beginPath();
+      for(let i=0;i<10;i++){
+        const a = -Math.PI/2 + i * Math.PI/5;
+        const rr = (i%2===0) ? 8*s : 3.6*s;
+        const x = Math.cos(a) * rr;
+        const y = Math.sin(a) * rr;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawCard(x,y,w,h,label,value,accent){
+      const rad = 24 * DPR;
+      ctx.save();
+      ctx.shadowColor = "rgba(80,115,135,0.30)";
+      ctx.shadowBlur = 24 * DPR;
+      ctx.shadowOffsetY = 10 * DPR;
+      roundedRect(x,y,w,h,rad);
+      const cg = ctx.createLinearGradient(x,y,x,y+h);
+      cg.addColorStop(0, "#ffffff");
+      cg.addColorStop(1, "#eef5f6");
+      ctx.fillStyle = cg;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = "#697684";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = Math.round(r.w*0.031*DPR) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(label, x + w*0.5, y + h*0.34);
+
+      ctx.fillStyle = accent || "#17263a";
+      ctx.font = Math.round(r.w*0.082*DPR) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(String(value), x + w*0.5, y + h*0.72);
+    }
+
+    const topY = (r.y + r.h*0.024) * DPR;
+    const sideW = r.w * 0.225 * DPR;
+    const centerW = r.w * 0.325 * DPR;
+    const cardH = r.h * 0.102 * DPR;
+    const gap = r.w * 0.035 * DPR;
+
+    const leftX = (r.x + r.w*0.03) * DPR;
+    const centerX = leftX + sideW + gap;
+    const rightX = centerX + centerW + gap;
+
+    const glowX = leftX + sideW*0.5;
+    const glowY = topY + cardH*0.22;
+    const glow = ctx.createRadialGradient(glowX, glowY, 10*DPR, glowX, glowY, 110*DPR);
+    glow.addColorStop(0, "rgba(255,255,255,0.80)");
+    glow.addColorStop(0.25, "rgba(255,255,255,0.30)");
+    glow.addColorStop(0.7, "rgba(255,255,255,0.08)");
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(glowX, glowY, 120*DPR, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(glowX, glowY);
+    for(let i=0;i<12;i++){
+      ctx.rotate(Math.PI/6);
+      ctx.globalAlpha = 0.05;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(-8*DPR, 0);
+      ctx.lineTo(8*DPR, 0);
+      ctx.lineTo(2*DPR, 68*DPR);
+      ctx.lineTo(-2*DPR, 68*DPR);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    drawCard(leftX, topY, sideW, cardH, "HIGHSCORE", state.best, "#13243a");
+    drawCard(centerX, topY + 6*DPR, centerW, cardH*0.92, "COMBO", state.streak>0 ? state.streak : 0, state.comboFlash>0 ? "#b14c00" : "#25384c");
+    drawCard(rightX, topY, sideW, cardH, "SCORE", state.score, "#13243a");
+
+    drawCrown(leftX + sideW*0.50, topY - 6*DPR, 0.95*DPR);
+    drawStar(rightX + sideW*0.50, topY - 5*DPR, 0.95*DPR);
+
+    if(state.comboTextT > 0 && state.streak > 0){
+      const a = 0.35 + state.comboTextT*0.65;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#ff8d1f";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = Math.round(r.w*0.040*DPR) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText("⭐ PERFECT COMBO! ⭐", centerX + centerW*0.5, topY + cardH*1.15 - (1-state.comboTextT)*18*DPR);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  
+function drawGroundShadow(){
+  const r = playfield();
+  const base = state.blocks[0];
+  if(!base) return;
+
+  const cx = (r.x + r.w * 0.5) * DPR;
+  const cy = (base.y + base.h + 18) * DPR;
+
+  const rx = base.w * 0.9 * DPR;
+  const ry = base.w * 0.35 * DPR;
+
+  const g = ctx.createRadialGradient(cx, cy, ry*0.2, cx, cy, rx);
+  g.addColorStop(0, "rgba(0,0,0,0.18)");
+  g.addColorStop(0.5, "rgba(0,0,0,0.10)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+  ctx.fill();
+}
+function render(){
+    drawBackground();
+    const r = playfield();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(r.x*DPR,r.y*DPR,r.w*DPR,r.h*DPR);
+    ctx.clip();
+
+    drawBaseShadow();
+    for(const b of state.blocks) drawBlock(b,1);
+    for(const s of state.scraps) drawBlock(s,0.92);
+
+    if(state.mover && !state.over){
+      const prev = state.blocks[state.blocks.length-1];
+      const guideAlpha = 0.10 + state.guidePulse * 0.16;
+      ctx.globalAlpha = guideAlpha;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 2 * DPR;
+      if(state.mover.dir === "x"){
+        const g1 = worldToScreen(prev.x, prev.y, state.mover.z + state.mover.h*0.52);
+        const g2 = worldToScreen(prev.x + prev.w, prev.y, state.mover.z + state.mover.h*0.52);
+        ctx.beginPath();
+        ctx.moveTo(g1.x*DPR, g1.y*DPR);
+        ctx.lineTo(g2.x*DPR, g2.y*DPR);
+        ctx.stroke();
+      } else {
+        const g1 = worldToScreen(prev.x, prev.y, state.mover.z + state.mover.h*0.52);
+        const g2 = worldToScreen(prev.x, prev.y + prev.d, state.mover.z + state.mover.h*0.52);
+        ctx.beginPath();
+        ctx.moveTo(g1.x*DPR, g1.y*DPR);
+        ctx.lineTo(g2.x*DPR, g2.y*DPR);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      drawBlock(state.mover,1);
+    }
+    drawParticles();
+
+    ctx.restore();
+    drawUI();
+  }
+
+  function tick(){ update(); render(); requestAnimationFrame(tick); }
+  function interact(e){ if(e) e.preventDefault(); place(); }
+
+  canvas.addEventListener("pointerdown", interact, {passive:false});
+  window.addEventListener("keydown", e => {
+    if(e.code==="Space"||e.code==="Enter"){ e.preventDefault(); interact(); }
+    if(state.milestoneT > 0){
+      const a = Math.min(1, state.milestoneT * 2.4);
+      const yLift = (1-state.milestoneT) * 20 * DPR;
+      const boxW = r.w * 0.64 * DPR;
+      const boxH = r.h * 0.088 * DPR;
+      const boxX = (r.x + r.w*0.18) * DPR;
+      const boxY = (r.y + r.h*0.155) * DPR - yLift;
+      const rad = 22 * DPR;
+
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.shadowColor = "rgba(80,110,130,0.25)";
+      ctx.shadowBlur = 18 * DPR;
+      ctx.shadowOffsetY = 8 * DPR;
+
+      ctx.beginPath();
+      ctx.moveTo(boxX+rad, boxY);
+      ctx.arcTo(boxX+boxW, boxY, boxX+boxW, boxY+boxH, rad);
+      ctx.arcTo(boxX+boxW, boxY+boxH, boxX, boxY+boxH, rad);
+      ctx.arcTo(boxX, boxY+boxH, boxX, boxY, rad);
+      ctx.arcTo(boxX, boxY, boxX+boxW, boxY, rad);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255,255,255,0.96)";
+      ctx.fill();
+
+      ctx.shadowColor = "transparent";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#6b7885";
+      ctx.font = Math.round(r.w*0.027*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText("SO HOCH WIE", boxX + boxW*0.5, boxY + boxH*0.28);
+      ctx.fillStyle = "#17263a";
+      ctx.font = Math.round(r.w*0.047*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(state.milestoneText, boxX + boxW*0.5, boxY + boxH*0.62);
+      ctx.fillStyle = "#718090";
+      ctx.font = Math.round(r.w*0.024*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(state.milestoneSub, boxX + boxW*0.5, boxY + boxH*0.86);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
+  });
+
+  resetGame();
+  tick();
+})();
+</script>
+</body>
+</html>
