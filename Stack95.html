@@ -91,7 +91,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     return THEMES[index % THEMES.length];
   }
 
-  const MIN_BLOCK_SIDE = 72; // verhindert winzige/degenerierte Dreiecks-Teile
+  const MIN_BLOCK_SIDE = 100; // no triangle-looking thin blocks
 
   const MILESTONES = [
     {blocks:5,  name:"House", height:"10 m"},
@@ -291,7 +291,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
         wasPerfect = true;
       }
 
-      if(overlap <= 0 || overlap < MIN_BLOCK_SIDE){
+      if(overlap <= 0){
         addScrap({...a}, dx>0);
         triggerGameOver();
         return;
@@ -300,11 +300,11 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       if(overlap < a.w){
         if(dx > 0){
           addScrap({x:a.x+overlap,y:a.y,z:a.z,w:a.w-overlap,d:a.d,h:a.h,theme:a.theme}, true);
-          a.w = overlap;
+          a.w = Math.max(overlap, MIN_BLOCK_SIDE);
         } else {
           addScrap({x:a.x,y:a.y,z:a.z,w:a.w-overlap,d:a.d,h:a.h,theme:a.theme}, false);
           a.x = prev.x;
-          a.w = overlap;
+          a.w = Math.max(overlap, MIN_BLOCK_SIDE);
         }
       }
     } else {
@@ -317,7 +317,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
         wasPerfect = true;
       }
 
-      if(overlap <= 0 || overlap < MIN_BLOCK_SIDE){
+      if(overlap <= 0){
         addScrap({...a}, dy>0);
         triggerGameOver();
         return;
@@ -326,11 +326,11 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       if(overlap < a.d){
         if(dy > 0){
           addScrap({x:a.x,y:a.y+overlap,z:a.z,w:a.w,d:a.d-overlap,h:a.h,theme:a.theme}, true);
-          a.d = overlap;
+          a.d = Math.max(overlap, MIN_BLOCK_SIDE);
         } else {
           addScrap({x:a.x,y:a.y,z:a.z,w:a.w,d:a.d-overlap,h:a.h,theme:a.theme}, false);
           a.y = prev.y;
-          a.d = overlap;
+          a.d = Math.max(overlap, MIN_BLOCK_SIDE);
         }
       }
     }
