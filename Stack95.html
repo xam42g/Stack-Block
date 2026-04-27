@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"/>
-<title>Stack95</title>
+<title>Stack90</title>
 <style>
 html,body{
   margin:0;height:100%;overflow:hidden;background:#000;
@@ -46,7 +46,7 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     {top:"#8AC926",left:"#6FA01D",right:"#567C17",bg1:"#a7d9dd",bg2:"#cde7c6"}
   ];
 
-  const STORAGE_KEY="stack95_best";
+  const STORAGE_KEY="stack90_best";
 
   function playfield(){
     const h = H*0.84;
@@ -59,7 +59,13 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     mover: null,
     scraps: [],
     particles: [],
+    stars: [],
     score: 0,
+    heightBlocks: 1,
+    milestoneText: "",
+    milestoneSub: "",
+    milestoneT: 0,
+    milestonesShown: {},
     streak: 0,
     comboFlash: 0,
     comboTextT: 0,
@@ -85,11 +91,40 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     return THEMES[index % THEMES.length];
   }
 
+  const MILESTONES = [
+    {blocks:5,  name:"House", height:"10 m"},
+    {blocks:10, name:"Church", height:"30 m"},
+    {blocks:17, name:"Big Ben", height:"96 m"},
+    {blocks:25, name:"Cologne Cathedral", height:"157 m"},
+    {blocks:34, name:"Eiffel Tower", height:"330 m"},
+    {blocks:42, name:"Skyscraper", height:"400 m"},
+    {blocks:50, name:"Airplane", height:"500 m"}
+  ];
+
+  function checkMilestone(){
+    for(const m of MILESTONES){
+      if(state.heightBlocks === m.blocks && !state.milestonesShown[m.blocks]){
+        state.milestonesShown[m.blocks] = true;
+        state.milestoneText = m.name;
+        state.milestoneSub = m.height;
+        state.milestoneT = 1;
+        addStarBurst((playfield().x + playfield().w*0.5), (playfield().y + playfield().h*0.22), 14);
+        break;
+      }
+    }
+  }
+
   function resetGame(){
     state.blocks = [{x:0,y:0,z:0,w:170,d:170,h:30,theme:0}];
     state.scraps = [];
     state.particles = [];
+    state.stars = [];
     state.score = 0;
+    state.heightBlocks = 1;
+    state.milestoneText = "";
+    state.milestoneSub = "";
+    state.milestoneT = 0;
+    state.milestonesShown = {};
     state.streak = 0;
     state.comboFlash = 0;
     state.comboTextT = 0;
@@ -216,13 +251,31 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     }
   }
 
+  function addStarBurst(x,y,n){
+    for(let i=0;i<n;i++){
+      const a = -Math.PI/2 + (Math.random()-0.5)*Math.PI*1.7;
+      const sp = 1.8 + Math.random()*3.8;
+      state.stars.push({
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp-1.0,
+        g:0.055+Math.random()*0.04,
+        rot:Math.random()*Math.PI*2,
+        vr:(Math.random()-0.5)*0.24,
+        size:7+Math.random()*8,
+        life:58+Math.random()*18,
+        max:76
+      });
+    }
+  }
+
   function place(){
     if(state.over){ resetGame(); return; }
     if(!state.mover) return;
 
     const a = state.mover;
     const prev = state.blocks[state.blocks.length-1];
-    const perfect = 12;
+    const perfect = 9;
 
     let wasPerfect = false;
 
@@ -281,12 +334,15 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     }
 
     state.blocks.push({x:a.x,y:a.y,z:a.z,w:a.w,d:a.d,h:a.h,theme:a.theme});
+    state.heightBlocks = state.blocks.length;
+    checkMilestone();
 
     let gain = 1;
     if(wasPerfect){
       state.streak += 1;
       gain = 2 + Math.max(0, state.streak - 1);
       state.comboFlash = 1;
+      state.comboTextT = 1;
       state.comboTextT = 1;
       state.guidePulse = 1;
     } else {
@@ -303,6 +359,9 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
 
     const burst = worldToScreen(a.x+a.w*0.5, a.y+a.d*0.5, a.z+a.h*0.65);
     addBurst(burst.x, burst.y, wasPerfect ? 26 : 8);
+    if(wasPerfect){
+      addStarBurst(burst.x, burst.y - 18, 10 + Math.min(18, state.streak*4));
+    }
     spawnMover();
   }
 
@@ -333,8 +392,9 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
 
     state.comboFlash = Math.max(0, state.comboFlash - 0.025);
 
-    state.comboFlash = Math.max(0, state.comboFlash - 0.018);
-    state.comboTextT = Math.max(0, state.comboTextT - 0.014);
+    state.comboFlash = Math.max(0, state.comboFlash - 0.016);
+    state.comboTextT = Math.max(0, state.comboTextT - 0.012);
+    state.milestoneT = Math.max(0, state.milestoneT - 0.006);
     state.guidePulse = Math.max(0, state.guidePulse - 0.025);
 
     for(const p of state.particles){
@@ -344,6 +404,15 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       p.life--;
     }
     state.particles = state.particles.filter(p=>p.life>0);
+
+    for(const st of state.stars){
+      st.x += st.vx;
+      st.y += st.vy;
+      st.vy += st.g;
+      st.rot += st.vr;
+      st.life--;
+    }
+    state.stars = state.stars.filter(st=>st.life>0);
 
     for(const s of state.scraps){
       s.vz += 0.28;
@@ -424,6 +493,29 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     ctx.globalAlpha = 1;
   }
 
+  function drawStarParticle(x,y,r,rot,alpha){
+    ctx.save();
+    ctx.translate(x*DPR,y*DPR);
+    ctx.rotate(rot);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#ffd84a";
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1.1*DPR;
+    ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const a = -Math.PI/2 + i*Math.PI/5;
+      const rr = (i%2===0 ? r : r*0.44)*DPR;
+      const px = Math.cos(a)*rr;
+      const py = Math.sin(a)*rr;
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
   function drawParticles(){
     for(const p of state.particles){
       const a = Math.max(0,p.life/p.max);
@@ -434,12 +526,17 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    for(const st of state.stars){
+      const a = Math.max(0, st.life/st.max);
+      drawStarParticle(st.x, st.y, st.size, st.rot, a);
+    }
   }
 
   function drawUI(){
     const r = playfield();
 
-    function roundedRect(x,y,w,h,rad){
+    function roundRect(x,y,w,h,rad){
       ctx.beginPath();
       ctx.moveTo(x+rad,y);
       ctx.arcTo(x+w,y,x+w,y+h,rad);
@@ -449,156 +546,118 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
       ctx.closePath();
     }
 
-    function drawCrown(cx, cy, s){
+    function drawSmallCard(x,y,w,h,label,value){
+      const rad = h*0.40;
       ctx.save();
-      ctx.translate(cx, cy);
-      ctx.fillStyle = "#f3c63b";
-      ctx.strokeStyle = "rgba(219,165,20,0.95)";
-      ctx.lineWidth = 1.2 * DPR;
-      ctx.beginPath();
-      ctx.moveTo(-11*s, 6*s);
-      ctx.lineTo(-11*s, 11*s);
-      ctx.lineTo(11*s, 11*s);
-      ctx.lineTo(11*s, 6*s);
-      ctx.lineTo(6*s, 6*s);
-      ctx.lineTo(3*s, -5*s);
-      ctx.lineTo(0, 1*s);
-      ctx.lineTo(-3*s, -6*s);
-      ctx.lineTo(-6*s, 6*s);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      for(const px of [-6,0,6]){
-        ctx.beginPath();
-        ctx.arc(px*s, -7*s, 1.6*s, 0, Math.PI*2);
-        ctx.fillStyle = "#ffe88b";
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    function drawStar(cx, cy, s){
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.fillStyle = "#f3c63b";
-      ctx.strokeStyle = "rgba(219,165,20,0.95)";
-      ctx.lineWidth = 1.0 * DPR;
-      ctx.beginPath();
-      for(let i=0;i<10;i++){
-        const a = -Math.PI/2 + i * Math.PI/5;
-        const rr = (i%2===0) ? 8*s : 3.6*s;
-        const x = Math.cos(a) * rr;
-        const y = Math.sin(a) * rr;
-        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawCard(x,y,w,h,label,value,accent){
-      const rad = 24 * DPR;
-      ctx.save();
-      ctx.shadowColor = "rgba(110,130,150,0.20)";
-      ctx.shadowBlur = 18 * DPR;
-      ctx.shadowOffsetY = 8 * DPR;
-      roundedRect(x,y,w,h,rad);
-      ctx.fillStyle = "#f5f6f8";
+      ctx.shadowColor = "rgba(0,0,0,0.20)";
+      ctx.shadowBlur = 10*DPR;
+      ctx.shadowOffsetY = 4*DPR;
+      roundRect(x,y,w,h,rad);
+      ctx.fillStyle = "rgba(255,255,255,0.96)";
       ctx.fill();
       ctx.restore();
 
-      ctx.fillStyle = "#697684";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = Math.round(r.w*0.031*DPR) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(label, x + w*0.5, y + h*0.34);
+      ctx.fillStyle = "#697684";
+      ctx.font = Math.round(r.w*0.023*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(label, x+w*0.5, y+h*0.30);
 
-      ctx.fillStyle = accent || "#17263a";
-      ctx.font = Math.round(r.w*0.082*DPR) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(String(value), x + w*0.5, y + h*0.72);
+      ctx.fillStyle = "#13243a";
+      ctx.font = Math.round(r.w*0.050*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(String(value), x+w*0.5, y+h*0.70);
     }
 
-    const topY = (r.y + r.h*0.024) * DPR;
-    const sideW = r.w * 0.225 * DPR;
-    const centerW = r.w * 0.325 * DPR;
-    const cardH = r.h * 0.102 * DPR;
-    const gap = r.w * 0.035 * DPR;
-
-    const leftX = (r.x + r.w*0.03) * DPR;
-    const centerX = leftX + sideW + gap;
-    const rightX = centerX + centerW + gap;
-
-    const glowX = leftX + sideW*0.5;
-    const glowY = topY + cardH*0.22;
-    const glow = ctx.createRadialGradient(glowX, glowY, 10*DPR, glowX, glowY, 110*DPR);
-    glow.addColorStop(0, "rgba(255,255,255,0.80)");
-    glow.addColorStop(0.25, "rgba(255,255,255,0.30)");
-    glow.addColorStop(0.7, "rgba(255,255,255,0.08)");
-    glow.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(glowX, glowY, 120*DPR, 0, Math.PI*2);
-    ctx.fill();
-
-    ctx.save();
-    ctx.translate(glowX, glowY);
-    for(let i=0;i<12;i++){
-      ctx.rotate(Math.PI/6);
-      ctx.globalAlpha = 0.05;
-      ctx.fillStyle = "#ffffff";
+    function drawMiniCrown(cx,cy,s){
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.fillStyle="#f3c63b";
       ctx.beginPath();
-      ctx.moveTo(-8*DPR, 0);
-      ctx.lineTo(8*DPR, 0);
-      ctx.lineTo(2*DPR, 68*DPR);
-      ctx.lineTo(-2*DPR, 68*DPR);
+      ctx.moveTo(-8*s,5*s);
+      ctx.lineTo(-8*s,9*s);
+      ctx.lineTo(8*s,9*s);
+      ctx.lineTo(8*s,5*s);
+      ctx.lineTo(4*s,5*s);
+      ctx.lineTo(2*s,-5*s);
+      ctx.lineTo(0,1*s);
+      ctx.lineTo(-2*s,-5*s);
+      ctx.lineTo(-4*s,5*s);
       ctx.closePath();
       ctx.fill();
+      ctx.restore();
     }
-    ctx.restore();
-    ctx.globalAlpha = 1;
 
-    drawCard(leftX, topY, sideW, cardH, "HIGHSCORE", state.best, "#13243a");
-    drawCard(centerX, topY + 6*DPR, centerW, cardH*0.92, "COMBO", state.streak>0 ? state.streak : 0, state.comboFlash>0 ? "#b14c00" : "#25384c");
-    drawCard(rightX, topY, sideW, cardH, "SCORE", state.score, "#13243a");
+    function drawMiniStar(cx,cy,s){
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.fillStyle="#f3c63b";
+      ctx.beginPath();
+      for(let i=0;i<10;i++){
+        const a=-Math.PI/2+i*Math.PI/5;
+        const rr=(i%2===0?7*s:3*s);
+        const px=Math.cos(a)*rr;
+        const py=Math.sin(a)*rr;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
 
-    drawCrown(leftX + sideW*0.50, topY - 6*DPR, 0.95*DPR);
-    drawStar(rightX + sideW*0.50, topY - 5*DPR, 0.95*DPR);
+    const cardH = Math.max(42*DPR, r.h*0.055*DPR);
+    const sideW = r.w*0.18*DPR;
+    const midW = r.w*0.22*DPR;
+    const topY = Math.max(8*DPR, (r.y - cardH - 10)*DPR);
+
+    const leftX = (r.x + r.w*0.05)*DPR;
+    const midX = (r.x + r.w*0.5)*DPR - midW*0.5;
+    const rightX = (r.x + r.w*0.77)*DPR;
+
+    drawSmallCard(leftX, topY, sideW, cardH, "BEST", state.best);
+    drawSmallCard(midX, topY, midW, cardH, "COMBO", state.streak>0 ? state.streak : 0);
+    drawSmallCard(rightX, topY, sideW, cardH, "SCORE", state.score);
+
+    drawMiniCrown(leftX + sideW*0.5, topY - 2*DPR, 0.85*DPR);
+    drawMiniStar(rightX + sideW*0.5, topY - 2*DPR, 0.85*DPR);
 
     if(state.comboTextT > 0 && state.streak > 0){
-      const a = 0.35 + state.comboTextT*0.65;
-      ctx.globalAlpha = a;
+      ctx.globalAlpha = Math.min(1, state.comboTextT*1.5);
       ctx.fillStyle = "#ff8d1f";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = Math.round(r.w*0.040*DPR) + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText("🔥 COMBO", centerX + centerW*0.5, topY + cardH*1.15 - (1-state.comboTextT)*18*DPR);
+      ctx.font = Math.round(r.w*0.034*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText("PERFECT COMBO", (r.x+r.w*0.5)*DPR, (topY+cardH+18*DPR));
+      ctx.globalAlpha = 1;
+    }
+
+    if(state.milestoneT > 0){
+      const a = Math.min(1, state.milestoneT * 2.4);
+      const boxW = r.w * 0.50 * DPR;
+      const boxH = r.h * 0.050 * DPR;
+      const boxX = (r.x + r.w*0.25) * DPR;
+      const boxY = Math.max(8*DPR, topY + cardH + 12*DPR);
+      const rad = boxH*0.40;
+
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.shadowColor = "rgba(0,0,0,0.22)";
+      ctx.shadowBlur = 12*DPR;
+      ctx.shadowOffsetY = 5*DPR;
+      roundRect(boxX, boxY, boxW, boxH, rad);
+      ctx.fillStyle = "rgba(255,255,255,0.97)";
+      ctx.fill();
+      ctx.restore();
+
+      ctx.globalAlpha = a;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#13243a";
+      ctx.font = Math.round(r.w*0.032*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(state.milestoneText + " · " + state.milestoneSub, boxX + boxW*0.5, boxY + boxH*0.52);
       ctx.globalAlpha = 1;
     }
   }
 
-  
-function drawGroundShadow(){
-  const r = playfield();
-  const base = state.blocks[0];
-  if(!base) return;
-
-  const cx = (r.x + r.w * 0.5) * DPR;
-  const cy = (base.y + base.h + 18) * DPR;
-
-  const rx = base.w * 0.9 * DPR;
-  const ry = base.w * 0.35 * DPR;
-
-  const g = ctx.createRadialGradient(cx, cy, ry*0.2, cx, cy, rx);
-  g.addColorStop(0, "rgba(0,0,0,0.18)");
-  g.addColorStop(0.5, "rgba(0,0,0,0.10)");
-  g.addColorStop(1, "rgba(0,0,0,0)");
-
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-  ctx.fill();
-}
 function render(){
     drawBackground();
     const r = playfield();
@@ -647,6 +706,47 @@ function render(){
   canvas.addEventListener("pointerdown", interact, {passive:false});
   window.addEventListener("keydown", e => {
     if(e.code==="Space"||e.code==="Enter"){ e.preventDefault(); interact(); }
+    if(state.milestoneT > 0){
+      const a = Math.min(1, state.milestoneT * 2.4);
+      const yLift = (1-state.milestoneT) * 20 * DPR;
+      const boxW = r.w * 0.64 * DPR;
+      const boxH = r.h * 0.088 * DPR;
+      const boxX = (r.x + r.w*0.18) * DPR;
+      const boxY = (r.y + r.h*0.155) * DPR - yLift;
+      const rad = 22 * DPR;
+
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.shadowColor = "rgba(80,110,130,0.25)";
+      ctx.shadowBlur = 18 * DPR;
+      ctx.shadowOffsetY = 8 * DPR;
+
+      ctx.beginPath();
+      ctx.moveTo(boxX+rad, boxY);
+      ctx.arcTo(boxX+boxW, boxY, boxX+boxW, boxY+boxH, rad);
+      ctx.arcTo(boxX+boxW, boxY+boxH, boxX, boxY+boxH, rad);
+      ctx.arcTo(boxX, boxY+boxH, boxX, boxY, rad);
+      ctx.arcTo(boxX, boxY, boxX+boxW, boxY, rad);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255,255,255,0.96)";
+      ctx.fill();
+
+      ctx.shadowColor = "transparent";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#6b7885";
+      ctx.font = Math.round(r.w*0.027*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText("SO HOCH WIE", boxX + boxW*0.5, boxY + boxH*0.28);
+      ctx.fillStyle = "#17263a";
+      ctx.font = Math.round(r.w*0.047*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(state.milestoneText, boxX + boxW*0.5, boxY + boxH*0.62);
+      ctx.fillStyle = "#718090";
+      ctx.font = Math.round(r.w*0.024*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(state.milestoneSub, boxX + boxW*0.5, boxY + boxH*0.86);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+
   });
 
   resetGame();
