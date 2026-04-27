@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"/>
-<title>Stack90</title>
+<title>Stack95</title>
 <style>
 html,body{
   margin:0;height:100%;overflow:hidden;background:#000;
@@ -34,24 +34,16 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
   const THEMES=[
-    {top:"#62C370",left:"#3F9A4E",right:"#2F7B3D",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#FF6B6B",left:"#D94C4C",right:"#B63D3D",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#4D96FF",left:"#2F74D6",right:"#225AA8",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#FFD93D",left:"#D7B428",right:"#B59018",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#B980F0",left:"#9464C9",right:"#7448A8",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#FF9F1C",left:"#D78112",right:"#B5660B",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#2EC4B6",left:"#21998E",right:"#18756E",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#F7B801",left:"#D09300",right:"#AA7600",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#F187B0",left:"#C96A90",right:"#A65173",bg1:"#a7d9dd",bg2:"#cde7c6"},
-    {top:"#8AC926",left:"#6FA01D",right:"#567C17",bg1:"#a7d9dd",bg2:"#cde7c6"}
+    {top:"#29bc42",left:"#0b761f",right:"#064f17",edge:"#85ff82"},
+    {top:"#ff3346",left:"#d20b20",right:"#850814",edge:"#ff9aa5"}
   ];
 
-  const STORAGE_KEY="stack90_best";
+  const STORAGE_KEY="stack95_best";
 
   function playfield(){
-    const h = H*0.84;
-    const w = Math.min(h*0.64, W*0.58);
-    return {x:(W-w)/2, y:(H-h)/2 + H*0.01, w, h};
+    const h = H;
+    const w = W;
+    return {x:0, y:0, w, h};
   }
 
   const state = {
@@ -424,37 +416,47 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
   }
 
   function drawBackground(){
-    const r = playfield();
-    ctx.fillStyle = "#000";
+    const g = ctx.createLinearGradient(0,0,0,CH);
+    g.addColorStop(0,"#041832");
+    g.addColorStop(0.23,"#00649d");
+    g.addColorStop(0.58,"#76d2d2");
+    g.addColorStop(1,"#ffe083");
+    ctx.fillStyle = g;
     ctx.fillRect(0,0,CW,CH);
 
-    const theme = themeFor(state.score);
-    const x=r.x*DPR, y=r.y*DPR, w=r.w*DPR, h=r.h*DPR;
+    const glow = ctx.createRadialGradient(CW*0.52,CH*0.43,20*DPR,CW*0.52,CH*0.50,CH*0.62);
+    glow.addColorStop(0,"rgba(255,255,255,0.20)");
+    glow.addColorStop(0.45,"rgba(105,230,255,0.12)");
+    glow.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0,0,CW,CH);
 
-    const g = ctx.createLinearGradient(0,y,0,y+h);
-    g.addColorStop(0, theme.bg1);
-    g.addColorStop(1, theme.bg2);
-    ctx.fillStyle = g;
-    ctx.fillRect(x,y,w,h);
-
-    const rg = ctx.createRadialGradient(x+w*0.5,y+h*0.35,20*DPR,x+w*0.5,y+h*0.65,h*0.82);
-    rg.addColorStop(0,"rgba(255,255,255,0.16)");
-    rg.addColorStop(1,"rgba(255,255,255,0)");
-    ctx.fillStyle = rg;
-    ctx.fillRect(x,y,w,h);
-
-    for(let i=0;i<20;i++){
-      const px = (r.x + ((i*101)%1000)/1000 * r.w) * DPR;
-      const py = (r.y + ((i*137 + performance.now()*0.01)%1000)/1000 * r.h) * DPR;
-      const s = ((i%3)+1) * DPR * 0.8;
-      ctx.globalAlpha = 0.16 + (i%4)*0.1;
-      ctx.fillStyle="#fff";
-      ctx.fillRect(px,py,s,s);
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = "#ffffff";
+    for(let i=0;i<34;i++){
+      const px = ((i*193)%1000)/1000 * CW;
+      const py = (0.05 + ((i*71)%1000)/1000 * 0.38) * CH;
+      const sz = (0.8 + (i%4)*0.45) * DPR;
+      ctx.fillRect(px,py,sz,sz);
     }
     ctx.globalAlpha = 1;
   }
 
   function drawBaseShadow(){}
+
+  function poly(points, fill, stroke, line=1.2){
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x*DPR, points[0].y*DPR);
+    for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x*DPR, points[i].y*DPR);
+    ctx.closePath();
+    ctx.fill();
+    if(stroke){
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = line*DPR;
+      ctx.stroke();
+    }
+  }
 
   function drawBlock(b, alpha=1){
     const t = themeFor(b.theme);
@@ -462,35 +464,52 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
     const p2 = worldToScreen(b.x+b.w,b.y,b.z+b.h);
     const p3 = worldToScreen(b.x+b.w,b.y+b.d,b.z+b.h);
     const p4 = worldToScreen(b.x,b.y+b.d,b.z+b.h);
-    const q1 = worldToScreen(b.x,b.y,b.z);
     const q2 = worldToScreen(b.x+b.w,b.y,b.z);
     const q3 = worldToScreen(b.x+b.w,b.y+b.d,b.z);
     const q4 = worldToScreen(b.x,b.y+b.d,b.z);
 
+    ctx.save();
     ctx.globalAlpha = alpha;
+    ctx.shadowColor = "rgba(0,0,0,0.32)";
+    ctx.shadowBlur = 16*DPR;
+    ctx.shadowOffsetY = 10*DPR;
 
-    ctx.fillStyle = t.left;
-    ctx.beginPath();
-    ctx.moveTo(p4.x*DPR,p4.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(q3.x*DPR,q3.y*DPR); ctx.lineTo(q4.x*DPR,q4.y*DPR);
-    ctx.closePath(); ctx.fill();
+    poly([p4,p3,q3,q4], t.left, "rgba(255,255,255,0.22)", 1.1);
+    poly([p2,p3,q3,q2], t.right, "rgba(0,0,0,0.18)", 1.1);
+    poly([p1,p2,p3,p4], t.top, "rgba(255,255,255,0.65)", 1.2);
 
-    ctx.fillStyle = t.right;
-    ctx.beginPath();
-    ctx.moveTo(p2.x*DPR,p2.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(q3.x*DPR,q3.y*DPR); ctx.lineTo(q2.x*DPR,q2.y*DPR);
-    ctx.closePath(); ctx.fill();
+    const shine = ctx.createLinearGradient(p1.x*DPR,p1.y*DPR,p3.x*DPR,p3.y*DPR);
+    shine.addColorStop(0,"rgba(255,255,255,0.28)");
+    shine.addColorStop(0.5,"rgba(255,255,255,0.04)");
+    shine.addColorStop(1,"rgba(0,0,0,0.10)");
+    poly([p1,p2,p3,p4], shine, null);
+    ctx.restore();
+  }
 
-    ctx.fillStyle = t.top;
-    ctx.beginPath();
-    ctx.moveTo(p1.x*DPR,p1.y*DPR); ctx.lineTo(p2.x*DPR,p2.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(p4.x*DPR,p4.y*DPR);
-    ctx.closePath(); ctx.fill();
-
-    ctx.strokeStyle = "rgba(0,0,0,0.18)";
-    ctx.lineWidth = 1.5*DPR;
-    ctx.beginPath();
-    ctx.moveTo(p1.x*DPR,p1.y*DPR); ctx.lineTo(p2.x*DPR,p2.y*DPR); ctx.lineTo(p3.x*DPR,p3.y*DPR); ctx.lineTo(q3.x*DPR,q3.y*DPR); ctx.lineTo(q4.x*DPR,q4.y*DPR); ctx.lineTo(p4.x*DPR,p4.y*DPR); ctx.closePath();
-    ctx.stroke();
-
-    ctx.globalAlpha = 1;
+  function drawTriangleMover(b, alpha=1){
+    const cx = b.x + b.w*0.5, cy = b.y + b.d*0.5;
+    const z = b.z + b.h*0.35;
+    const size = Math.max(b.w,b.d)*0.92;
+    const depth = b.h*1.00;
+    const A = worldToScreen(cx-size*0.55, cy-size*0.45, z+depth);
+    const B = worldToScreen(cx-size*0.55, cy+size*0.62, z+depth);
+    const C = worldToScreen(cx+size*0.68, cy+size*0.06, z+depth);
+    const A2 = worldToScreen(cx-size*0.55, cy-size*0.45, z);
+    const B2 = worldToScreen(cx-size*0.55, cy+size*0.62, z);
+    const C2 = worldToScreen(cx+size*0.68, cy+size*0.06, z);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 18*DPR;
+    ctx.shadowOffsetY = 8*DPR;
+    poly([B,C,C2,B2], "#8d0612", "rgba(0,0,0,0.22)", 1.0);
+    poly([A,B,B2,A2], "#d60c20", "rgba(255,255,255,0.26)", 1.0);
+    poly([A,B,C], "#ff3346", "rgba(255,255,255,0.78)", 1.2);
+    const shine = ctx.createLinearGradient(A.x*DPR,A.y*DPR,C.x*DPR,C.y*DPR);
+    shine.addColorStop(0,"rgba(255,255,255,0.35)");
+    shine.addColorStop(1,"rgba(255,255,255,0)");
+    poly([A,B,C], shine, null);
+    ctx.restore();
   }
 
   function drawStarParticle(x,y,r,rot,alpha){
@@ -534,131 +553,67 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
   }
 
   function drawUI(){
-    const r = playfield();
+    const cardY = Math.max(24, H*0.028) * DPR;
+    const cardH = Math.max(92, H*0.115) * DPR;
+    const cardW = Math.min(238, W*0.21) * DPR;
+    const gap = Math.max(18, W*0.022) * DPR;
+    const total = cardW*3 + gap*2;
+    const sx = (CW-total)/2;
 
-    function roundRect(x,y,w,h,rad){
+    function neonRoundRect(x,y,w,h,r){
       ctx.beginPath();
-      ctx.moveTo(x+rad,y);
-      ctx.arcTo(x+w,y,x+w,y+h,rad);
-      ctx.arcTo(x+w,y+h,x,y+h,rad);
-      ctx.arcTo(x,y+h,x,y,rad);
-      ctx.arcTo(x,y,x+w,y,rad);
-      ctx.closePath();
+      ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
     }
-
-    function drawSmallCard(x,y,w,h,label,value){
-      const rad = h*0.40;
+    function drawHudCard(x,y,w,h,icon,label,value,active=false,gold=false){
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.20)";
-      ctx.shadowBlur = 10*DPR;
-      ctx.shadowOffsetY = 4*DPR;
-      roundRect(x,y,w,h,rad);
-      ctx.fillStyle = "rgba(255,255,255,0.96)";
-      ctx.fill();
-      ctx.restore();
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#697684";
-      ctx.font = Math.round(r.w*0.023*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(label, x+w*0.5, y+h*0.30);
-
-      ctx.fillStyle = "#13243a";
-      ctx.font = Math.round(r.w*0.050*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(String(value), x+w*0.5, y+h*0.70);
-    }
-
-    function drawMiniCrown(cx,cy,s){
-      ctx.save();
-      ctx.translate(cx,cy);
-      ctx.fillStyle="#f3c63b";
-      ctx.beginPath();
-      ctx.moveTo(-8*s,5*s);
-      ctx.lineTo(-8*s,9*s);
-      ctx.lineTo(8*s,9*s);
-      ctx.lineTo(8*s,5*s);
-      ctx.lineTo(4*s,5*s);
-      ctx.lineTo(2*s,-5*s);
-      ctx.lineTo(0,1*s);
-      ctx.lineTo(-2*s,-5*s);
-      ctx.lineTo(-4*s,5*s);
-      ctx.closePath();
-      ctx.fill();
+      ctx.shadowColor = active ? "rgba(0,190,255,0.95)" : "rgba(0,190,255,0.42)";
+      ctx.shadowBlur = active ? 24*DPR : 12*DPR;
+      neonRoundRect(x,y,w,h,20*DPR);
+      const g = ctx.createLinearGradient(x,y,x,y+h);
+      g.addColorStop(0,"rgba(4,31,58,0.80)");
+      g.addColorStop(0.52,"rgba(4,20,39,0.68)");
+      g.addColorStop(1,"rgba(1,14,31,0.82)");
+      ctx.fillStyle = g; ctx.fill();
+      ctx.lineWidth = (active?2.5:1.3)*DPR;
+      ctx.strokeStyle = active ? "rgba(45,210,255,0.98)" : "rgba(38,190,255,0.62)";
+      ctx.stroke();
+      if(gold){ ctx.strokeStyle="rgba(255,225,80,0.42)"; ctx.beginPath(); ctx.moveTo(x+18*DPR,y+h-1*DPR); ctx.lineTo(x+w*0.55,y+h-1*DPR); ctx.stroke(); }
+      ctx.shadowColor = "transparent";
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font = Math.round(h*0.23)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillStyle = "#ffd73a"; ctx.fillText(icon, x+w*0.5, y+h*0.24);
+      ctx.font = '700 '+Math.round(h*0.13)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillStyle = "rgba(255,255,255,0.88)"; ctx.fillText(label, x+w*0.5, y+h*0.50);
+      ctx.font = '800 '+Math.round(h*0.29)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillStyle = "#ffffff"; ctx.fillText(String(value), x+w*0.5, y+h*0.76);
       ctx.restore();
     }
+    drawHudCard(sx, cardY, cardW, cardH, "♛", "BEST", state.best, false, true);
+    drawHudCard(sx+cardW+gap, cardY, cardW, cardH, "★", "COMBO", state.streak>0?state.streak:0, true, false);
+    drawHudCard(sx+(cardW+gap)*2, cardY, cardW, cardH, "🏆", "SCORE", state.score, false, false);
 
-    function drawMiniStar(cx,cy,s){
-      ctx.save();
-      ctx.translate(cx,cy);
-      ctx.fillStyle="#f3c63b";
-      ctx.beginPath();
-      for(let i=0;i<10;i++){
-        const a=-Math.PI/2+i*Math.PI/5;
-        const rr=(i%2===0?7*s:3*s);
-        const px=Math.cos(a)*rr;
-        const py=Math.sin(a)*rr;
-        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "rgba(52,214,255,0.65)"; ctx.lineWidth=1.5*DPR;
+    for(const x of [sx+cardW+gap*0.5, sx+cardW*2+gap*1.5]){
+      ctx.beginPath(); ctx.moveTo(x, cardY+cardH*0.26); ctx.lineTo(x, cardY+cardH*0.74); ctx.stroke();
+      ctx.fillStyle = "rgba(52,214,255,0.95)";
+      ctx.beginPath(); ctx.moveTo(x,cardY+cardH*0.5-7*DPR); ctx.lineTo(x+7*DPR,cardY+cardH*0.5); ctx.lineTo(x,cardY+cardH*0.5+7*DPR); ctx.lineTo(x-7*DPR,cardY+cardH*0.5); ctx.closePath(); ctx.fill();
     }
-
-    const cardH = Math.max(42*DPR, r.h*0.055*DPR);
-    const sideW = r.w*0.18*DPR;
-    const midW = r.w*0.22*DPR;
-    const topY = Math.max(8*DPR, (r.y - cardH - 10)*DPR);
-
-    const leftX = (r.x + r.w*0.05)*DPR;
-    const midX = (r.x + r.w*0.5)*DPR - midW*0.5;
-    const rightX = (r.x + r.w*0.77)*DPR;
-
-    drawSmallCard(leftX, topY, sideW, cardH, "BEST", state.best);
-    drawSmallCard(midX, topY, midW, cardH, "COMBO", state.streak>0 ? state.streak : 0);
-    drawSmallCard(rightX, topY, sideW, cardH, "SCORE", state.score);
-
-    drawMiniCrown(leftX + sideW*0.5, topY - 2*DPR, 0.85*DPR);
-    drawMiniStar(rightX + sideW*0.5, topY - 2*DPR, 0.85*DPR);
-
-    if(state.comboTextT > 0 && state.streak > 0){
-      ctx.globalAlpha = Math.min(1, state.comboTextT*1.5);
-      ctx.fillStyle = "#ff8d1f";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = Math.round(r.w*0.034*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText("PERFECT COMBO", (r.x+r.w*0.5)*DPR, (topY+cardH+18*DPR));
-      ctx.globalAlpha = 1;
-    }
+    ctx.restore();
 
     if(state.milestoneT > 0){
       const a = Math.min(1, state.milestoneT * 2.4);
-      const boxW = r.w * 0.50 * DPR;
-      const boxH = r.h * 0.050 * DPR;
-      const boxX = (r.x + r.w*0.25) * DPR;
-      const boxY = Math.max(8*DPR, topY + cardH + 12*DPR);
-      const rad = boxH*0.40;
-
       ctx.save();
-      ctx.globalAlpha = a;
-      ctx.shadowColor = "rgba(0,0,0,0.22)";
-      ctx.shadowBlur = 12*DPR;
-      ctx.shadowOffsetY = 5*DPR;
-      roundRect(boxX, boxY, boxW, boxH, rad);
-      ctx.fillStyle = "rgba(255,255,255,0.97)";
-      ctx.fill();
+      ctx.globalAlpha=a;
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillStyle="#fff"; ctx.font='800 '+Math.round(W*0.034*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      ctx.fillText(state.milestoneText + " · " + state.milestoneSub, CW*0.5, CH*0.19);
       ctx.restore();
-
-      ctx.globalAlpha = a;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#13243a";
-      ctx.font = Math.round(r.w*0.032*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(state.milestoneText + " · " + state.milestoneSub, boxX + boxW*0.5, boxY + boxH*0.52);
-      ctx.globalAlpha = 1;
     }
   }
 
-function render(){
+  function render(){
     drawBackground();
     const r = playfield();
     ctx.save();
@@ -679,20 +634,14 @@ function render(){
       if(state.mover.dir === "x"){
         const g1 = worldToScreen(prev.x, prev.y, state.mover.z + state.mover.h*0.52);
         const g2 = worldToScreen(prev.x + prev.w, prev.y, state.mover.z + state.mover.h*0.52);
-        ctx.beginPath();
-        ctx.moveTo(g1.x*DPR, g1.y*DPR);
-        ctx.lineTo(g2.x*DPR, g2.y*DPR);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(g1.x*DPR, g1.y*DPR); ctx.lineTo(g2.x*DPR, g2.y*DPR); ctx.stroke();
       } else {
         const g1 = worldToScreen(prev.x, prev.y, state.mover.z + state.mover.h*0.52);
         const g2 = worldToScreen(prev.x, prev.y + prev.d, state.mover.z + state.mover.h*0.52);
-        ctx.beginPath();
-        ctx.moveTo(g1.x*DPR, g1.y*DPR);
-        ctx.lineTo(g2.x*DPR, g2.y*DPR);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(g1.x*DPR, g1.y*DPR); ctx.lineTo(g2.x*DPR, g2.y*DPR); ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      drawBlock(state.mover,1);
+      drawTriangleMover(state.mover,1);
     }
     drawParticles();
 
@@ -706,47 +655,6 @@ function render(){
   canvas.addEventListener("pointerdown", interact, {passive:false});
   window.addEventListener("keydown", e => {
     if(e.code==="Space"||e.code==="Enter"){ e.preventDefault(); interact(); }
-    if(state.milestoneT > 0){
-      const a = Math.min(1, state.milestoneT * 2.4);
-      const yLift = (1-state.milestoneT) * 20 * DPR;
-      const boxW = r.w * 0.64 * DPR;
-      const boxH = r.h * 0.088 * DPR;
-      const boxX = (r.x + r.w*0.18) * DPR;
-      const boxY = (r.y + r.h*0.155) * DPR - yLift;
-      const rad = 22 * DPR;
-
-      ctx.save();
-      ctx.globalAlpha = a;
-      ctx.shadowColor = "rgba(80,110,130,0.25)";
-      ctx.shadowBlur = 18 * DPR;
-      ctx.shadowOffsetY = 8 * DPR;
-
-      ctx.beginPath();
-      ctx.moveTo(boxX+rad, boxY);
-      ctx.arcTo(boxX+boxW, boxY, boxX+boxW, boxY+boxH, rad);
-      ctx.arcTo(boxX+boxW, boxY+boxH, boxX, boxY+boxH, rad);
-      ctx.arcTo(boxX, boxY+boxH, boxX, boxY, rad);
-      ctx.arcTo(boxX, boxY, boxX+boxW, boxY, rad);
-      ctx.closePath();
-      ctx.fillStyle = "rgba(255,255,255,0.96)";
-      ctx.fill();
-
-      ctx.shadowColor = "transparent";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#6b7885";
-      ctx.font = Math.round(r.w*0.027*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText("SO HOCH WIE", boxX + boxW*0.5, boxY + boxH*0.28);
-      ctx.fillStyle = "#17263a";
-      ctx.font = Math.round(r.w*0.047*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(state.milestoneText, boxX + boxW*0.5, boxY + boxH*0.62);
-      ctx.fillStyle = "#718090";
-      ctx.font = Math.round(r.w*0.024*DPR)+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-      ctx.fillText(state.milestoneSub, boxX + boxW*0.5, boxY + boxH*0.86);
-      ctx.restore();
-      ctx.globalAlpha = 1;
-    }
-
   });
 
   resetGame();
